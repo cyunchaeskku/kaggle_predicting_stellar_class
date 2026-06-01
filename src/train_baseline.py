@@ -28,12 +28,23 @@ except ImportError as exc:  # pragma: no cover
 
 TARGET = "class"
 ID_COL = "id"
-CAT_COLS = ["spectral_type", "galaxy_population"]
+RAW_CAT_COLS = ["spectral_type", "galaxy_population"]
+DERIVED_CAT_COLS = ["spectral_population"]
+CAT_COLS = RAW_CAT_COLS + DERIVED_CAT_COLS
 BANDS = ["u", "g", "r", "i", "z"]
 BASE_NUMERIC = ["alpha", "delta", "u", "g", "r", "i", "z", "redshift"]
+SPECTRAL_TYPES = ["A/F", "G/K", "M", "O/B"]
+GALAXY_POPULATIONS = ["Blue_Cloud", "Red_Sequence"]
 CAT_DTYPES = {
-    "spectral_type": CategoricalDtype(categories=["A/F", "G/K", "M", "O/B"]),
-    "galaxy_population": CategoricalDtype(categories=["Blue_Cloud", "Red_Sequence"]),
+    "spectral_type": CategoricalDtype(categories=SPECTRAL_TYPES),
+    "galaxy_population": CategoricalDtype(categories=GALAXY_POPULATIONS),
+    "spectral_population": CategoricalDtype(
+        categories=[
+            f"{spectral}__{population}"
+            for spectral in SPECTRAL_TYPES
+            for population in GALAXY_POPULATIONS
+        ]
+    ),
 }
 
 
@@ -102,7 +113,7 @@ def reduce_memory(df: pd.DataFrame, has_target: bool) -> pd.DataFrame:
     for col in numeric_cols:
         df[col] = df[col].astype("float32")
     df[ID_COL] = df[ID_COL].astype("int32")
-    for col in CAT_COLS:
+    for col in RAW_CAT_COLS:
         df[col] = df[col].astype(CAT_DTYPES[col])
     if has_target:
         df[TARGET] = df[TARGET].astype("category")
@@ -129,6 +140,30 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     df["alpha_cos"] = np.cos(alpha_rad).astype("float32")
     df["delta_sin"] = np.sin(delta_rad).astype("float32")
     df["delta_cos"] = np.cos(delta_rad).astype("float32")
+    cos_delta = np.cos(delta_rad)
+    df["coord_x"] = (cos_delta * np.cos(alpha_rad)).astype("float32")
+    df["coord_y"] = (cos_delta * np.sin(alpha_rad)).astype("float32")
+    df["coord_z"] = np.sin(delta_rad).astype("float32")
+
+    redshift = df["redshift"].astype("float32")
+    redshift_abs = np.abs(redshift)
+    df["redshift_abs"] = redshift_abs.astype("float32")
+    df["redshift_log1p_abs"] = np.log1p(redshift_abs).astype("float32")
+    df["redshift_bin"] = np.digitize(
+        redshift,
+        bins=np.array([-0.001, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 5.0], dtype="float32"),
+    ).astype("int8")
+    df["is_redshift_near_zero"] = (redshift_abs <= 0.005).astype("int8")
+    df["is_redshift_low"] = (redshift < 0.1).astype("int8")
+    df["is_redshift_high"] = (redshift >= 1.0).astype("int8")
+    df["redshift_x_mag_mean"] = (redshift * df["mag_mean"]).astype("float32")
+    df["redshift_x_mag_range"] = (redshift * df["mag_range"]).astype("float32")
+
+    df["spectral_population"] = (
+        df["spectral_type"].astype("string")
+        + "__"
+        + df["galaxy_population"].astype("string")
+    ).astype(CAT_DTYPES["spectral_population"])
 
     for color in ["u-g", "g-r", "r-i", "i-z", "u-z"]:
         df[f"redshift_x_{color}"] = (df["redshift"] * df[color]).astype("float32")
@@ -303,6 +338,12 @@ def main() -> None:
         submission[TARGET] = labels.inverse_transform(np.argmax(test_pred * final_weights, axis=1))
         submission.to_csv(args.output_dir / "submission.csv", index=False)
         print(f"wrote_submission={args.output_dir / 'submission.csv'} rows={len(submission)}")
+
+        test_proba_df = sample[[ID_COL]].copy()
+        for idx, cls in enumerate(labels.classes_):
+            test_proba_df[f"proba_{cls}"] = test_pred[:, idx]
+        test_proba_df.to_csv(args.output_dir / "test_probabilities.csv", index=False)
+        print(f"wrote_test_probabilities={args.output_dir / 'test_probabilities.csv'} rows={len(test_proba_df)}")
 
 
 if __name__ == "__main__":

@@ -113,6 +113,34 @@ First full-run result:
 - Class multipliers: `GALAXY:0.62123`, `QSO:1.11560`, `STAR:1.26317`.
 - Submission rows: `247435`.
 
+## Current Feature Upgrade
+
+After the first version, `src/train_baseline.py` was extended with three feature groups to test next:
+
+1. Redshift bins and flags:
+   - `redshift_abs`
+   - `redshift_log1p_abs`
+   - `redshift_bin`
+   - `is_redshift_near_zero`
+   - `is_redshift_low`
+   - `is_redshift_high`
+   - `redshift_x_mag_mean`
+   - `redshift_x_mag_range`
+2. Cartesian sky coordinates from `alpha` and `delta`:
+   - `coord_x`
+   - `coord_y`
+   - `coord_z`
+3. Combined categorical feature:
+   - `spectral_population = spectral_type + "__" + galaxy_population`
+
+Treat this as an experimental feature-upgraded LGBM variant until CV and Kaggle scores prove it beats the first baseline.
+
+Current best Kaggle submission:
+
+- File: `outputs/lgbm_feature_upgrade/submission.csv`
+- Public score: `0.96808`
+- Status: highest known score so far for this project.
+
 ## Recommended Next Steps
 
 1. Patch training script to save `test_probabilities.csv` for ensembling.
@@ -121,7 +149,7 @@ First full-run result:
    - raw no multiplier
    - deeper: `--n-estimators 4000 --num-leaves 127 --min-child-samples 60`
    - conservative: `--num-leaves 31 --min-child-samples 140 --reg-lambda 1.0`
-4. Add color-magnitude interactions and `spectral_type + galaxy_population` combo category.
+4. Evaluate the current feature-upgraded LGBM variant against the first baseline before submitting.
 5. Add XGBoost model for ensemble diversity.
 6. Submit only high-confidence candidates; avoid public leaderboard overfitting.
 
