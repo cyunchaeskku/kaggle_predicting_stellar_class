@@ -8,6 +8,10 @@ This repo is for Kaggle Playground Series S6E6: Predicting Stellar Class.
 - Current workspace: `/Users/yunchae/Desktop/Careers/sideProject/kaggle_predciting_stellar_class`
 - Current local date from environment: 2026-06-01, timezone `Asia/Seoul`.
 - User provided Kaggle overview text because direct Kaggle page access was limited.
+- Git remote: `https://github.com/cyunchaeskku/kaggle_predicting_stellar_class.git`
+- First preserved commit: `b11c871 Add baseline stellar classification pipeline`.
+- User asked to avoid `git diff` unless needed because it can print too many lines.
+- User reported first baseline reached Kaggle public rank `6 / 125`.
 
 ## Competition Facts
 
@@ -79,21 +83,53 @@ Categorical values:
 - `spectral_type`: `A/F`, `G/K`, `M`, `O/B`
 - `galaxy_population`: `Blue_Cloud`, `Red_Sequence`
 
+## Current First Version
+
+Implemented files:
+
+- `src/train_baseline.py`
+- `README.md`
+- `.gitignore`
+
+Baseline model:
+
+- LightGBM multiclass classifier.
+- 5-fold stratified CV.
+- Uses raw numeric features, categorical features, color indices, magnitude summaries, coordinate sine/cosine features, and redshift-color interactions.
+- Uses `class_weight="balanced"` and OOF class multiplier tuning.
+- Main output directory: `outputs/lgbm_baseline/`.
+- Main submission file: `outputs/lgbm_baseline/submission.csv`.
+
+Full baseline command:
+
+```bash
+python3 src/train_baseline.py --output-dir outputs/lgbm_baseline
+```
+
+First full-run result:
+
+- OOF balanced accuracy: `0.964731`.
+- Tuned OOF balanced accuracy: `0.966328`.
+- Class multipliers: `GALAXY:0.62123`, `QSO:1.11560`, `STAR:1.26317`.
+- Submission rows: `247435`.
+
 ## Recommended Next Steps
 
-1. Create lightweight EDA notebook or script.
-2. Build baseline model with stratified cross-validation and balanced accuracy.
-3. Use features:
-   - Numeric: `alpha`, `delta`, `u`, `g`, `r`, `i`, `z`, `redshift`
-   - Categorical: `spectral_type`, `galaxy_population`
-   - Useful engineered colors: `u-g`, `g-r`, `r-i`, `i-z`
-4. Try tree models first: LightGBM, CatBoost, XGBoost, or sklearn HistGradientBoosting/RandomForest if dependencies are limited.
-5. Save predictions as `submission.csv` with exactly `id,class`.
+1. Patch training script to save `test_probabilities.csv` for ensembling.
+2. Create `src/ensemble.py` to average OOF/test probabilities and tune class multipliers on ensemble OOF.
+3. Run controlled LightGBM variants:
+   - raw no multiplier
+   - deeper: `--n-estimators 4000 --num-leaves 127 --min-child-samples 60`
+   - conservative: `--num-leaves 31 --min-child-samples 140 --reg-lambda 1.0`
+4. Add color-magnitude interactions and `spectral_type + galaxy_population` combo category.
+5. Add XGBoost model for ensemble diversity.
+6. Submit only high-confidence candidates; avoid public leaderboard overfitting.
 
 ## Notes For Future Agents
 
 - Do not delete or re-download data unless user asks.
 - Do not use full-file `READ` on CSV files under `data/playground-series-s6e6/`; they have many rows. Use `head` to check columns or small samples when needed.
 - Prefer `rg`, `head`, `wc`, and pandas quick checks for exploration.
-- Keep changes scoped. This repo currently has only data plus this context file.
+- Keep changes scoped. This repo has tracked data plus baseline code.
 - If adding notebooks, keep outputs reasonable or clear them before commit unless user wants saved outputs.
+- Do not run destructive git commands such as `git reset --hard` unless user explicitly asks.
