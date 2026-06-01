@@ -176,10 +176,10 @@ def add_frequency_encoding(train: pd.DataFrame, test: pd.DataFrame | None) -> tu
     )
     freq_map = combined.value_counts().to_dict()
     train = train.copy()
-    train["spectral_population_count"] = train["spectral_population"].map(freq_map).fillna(0).astype("int32")
+    train["spectral_population_count"] = train["spectral_population"].astype(str).map(freq_map).fillna(0).astype("int32")
     if test is not None:
         test = test.copy()
-        test["spectral_population_count"] = test["spectral_population"].map(freq_map).fillna(0).astype("int32")
+        test["spectral_population_count"] = test["spectral_population"].astype(str).map(freq_map).fillna(0).astype("int32")
     return train, test
 
 
